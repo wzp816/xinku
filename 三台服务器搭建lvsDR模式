@@ -1,0 +1,57 @@
+三台服务器
+  一台代理服务器 192.168.80.82  
+  两台web服务器 192.168.80.81  192.168.80.80
+
+代理服务器需要配置虚拟ip vip 安装 ipvsadm
+清除所有规则
+ipvsadm -C
+创建新的集群服务器规则
+ipvsadm -A -t 192.168.80.8 -wrr
+添加真实服务器
+ipvsadm -a -t 192.168.80.8：80 -r 192.168.80.80 -g -w 1
+ipvsadm -a -t 192.168.80.8：80 -r 192.168.80.81 -g -w 1
+查看规则列表
+ipvsadm -Ln
+保存规则
+ipvsadm-save-n 〉/etc/sysconfig/ipvsadm
+[root@server ~]# cat /etc/sysconfig/network-scripts/ifcfg-lo:0
+DEVICE=lo:0
+IPADDR=192.168.80.8
+NETMASK=255.255.255.255
+NETWORK=192.168.80.8
+BROADCAST=192.168.80.8
+ONBOOT=yes
+NAME=lo:0
+
+两台web服务器也是要配置虚拟ip vip 还要修改内核参数
+[root@server ~]# cat /etc/sysconfig/network-scripts/ifcfg-lo:0
+DEVICE=lo:0
+IPADDR=192.168.80.8
+NETMASK=255.255.255.255
+NETWORK=192.168.80.8
+BROADCAST=192.168.80.8
+ONBOOT=yes
+NAME=lo:0
+
+[root@server ~]# cat /etc/sysctl.conf 
+net.ipv4.conf.all.arp_ignore = 1
+net.ipv4.conf.lo.arp_ignore = 1
+net.ipv4.conf.lo.arp_announce = 2
+net.ipv4.conf.all.arp_announce = 2
+#当有arp广播问谁是191.168.80.8 时，本机忽略该ARP广播，
+
+
+lvs——nat模式
+主管服务器要有两个网卡，一个内网ip——192.168.80.82 一个外网ip——192.168.190.23。
+在主管代理服务器上开启路由转发
+[root@server ~]# echo 1  > /proc/sys/net/ipv4/ip_forward #	临时生效
+                 echo net.ipv4.ip_forward = 1 >> /etc/sysctl.conf #永久生效
+yum install -y ipvsadm
+
+ipvsadm -C #清空规则
+ipvsadm -Ln #查看规则列表
+ipvsadm -A -t 192.168.190.23：80 -s wrr  #指定lvs规则
+ipvsadm -a -t 192.168.190.23：80 -r 192.168.80.80 -m -w 1 #添加真实web服务器 
+ipvsadm -a -t 192.168.190.23：80 -r 192.168.80.81 -m -w 2  #添加真实web服务器，加权连接2
+
+两台web服务器192.168.80.80——192.168.80.81 #默认网关改为192.168.80.82 #即可
